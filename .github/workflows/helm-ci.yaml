@@ -1,0 +1,42 @@
+name: Helm Chart CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  helm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Helm Lint
+        run: helm lint charts/nginx-custom
+
+      - name: Helm template -  render
+        run: helm template test charts/nginx-custom
+
+      - name: Helm Install Test - kind local cluster validated
+        uses: helm/kind-action@v1
+        with:
+          helm: v3.14.0
+          cluster_name: helm-test
+
+      - name: Deploy chart
+        run: |
+          helm install test charts/nginx-custom
+          kubectl rollout status deployment/nginx-custom-selinux
+
+      - name: Helm Test (curl validation)
+        run: |
+          kubectl port-forward svc/nginx-custom-selinux 8080:8080 &
+          sleep 5
+          curl -f http://localhost:8080/health
+          curl -f http://localhost:8080/metrics

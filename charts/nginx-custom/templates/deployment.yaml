@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nginx-custom.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "nginx-custom.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "nginx-custom.fullname" . }}
+    spec:
+      securityContext:
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+      containers:
+      - name: nginx
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          runAsUser: {{ .Values.securityContext.runAsUser }}
+          runAsGroup: {{ .Values.securityContext.runAsGroup }}
+          runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+          readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+          allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+        ports:
+          - containerPort: 8080
+        command:
+          - /bin/sh
+          - -c
+          - |
+            mkdir -p /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
+            cp /etc/nginx/nginx.conf.template /tmp/nginx.conf && \
+            nginx -c /tmp/nginx.conf -g 'daemon off;'
+        volumeMounts:
+          - name: config
+            mountPath: /etc/nginx
+          - name: tmp
+            mountPath: /tmp
+          - name: cache
+            mountPath: /var/cache/nginx
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "nginx-custom.fullname" . }}
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
